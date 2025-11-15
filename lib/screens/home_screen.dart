@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'chatbot_screen.dart';
 import 'park_cleaning_game_screen.dart';
+import '../services/game_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -155,7 +156,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           ),
                       textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 40),
+                    const SizedBox(height: 30),
+                    
+                    // High Scores Section
+                    _buildHighScoresSection(context, colorScheme),
+                    
+                    const SizedBox(height: 30),
 
                     // Games Grid with modern cards
                     Text(
@@ -174,16 +180,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       mainAxisSpacing: 20,
                       crossAxisSpacing: 20,
                       children: [
-                        _buildGameCard(
-                          context,
-                          title: 'نظّف الحديقة',
-                          emoji: '🧹',
-                          gradient: [
-                            const Color(0xFF27AE60),
-                            const Color(0xFF1E8449),
-                          ],
-                          delay: 0,
-                        ),
+                        _buildParkGameCard(context, delay: 0),
                         _buildGameCard(
                           context,
                           title: 'اللعبة الثانية',
@@ -342,6 +339,150 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+  Widget _buildParkGameCard(BuildContext context, {required int delay}) {
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _getGameStats(),
+      builder: (context, snapshot) {
+        final currentLevel = snapshot.data?['currentLevel'] ?? 1;
+        final bestTime = snapshot.data?['bestTime'];
+        
+        return GestureDetector(
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => const ParkCleaningGameScreen(),
+              ),
+            );
+          },
+          child: Card(
+            elevation: 12,
+            shadowColor: const Color(0xFF27AE60).withOpacity(0.4),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFF27AE60),
+                    Color(0xFF1E8449),
+                  ],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF27AE60).withOpacity(0.3),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Stack(
+                children: [
+                  // Background pattern
+                  Positioned(
+                    top: -20,
+                    right: -20,
+                    child: Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withOpacity(0.1),
+                      ),
+                    ),
+                  ),
+                  // Content
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            '🧹',
+                            style: TextStyle(fontSize: 48),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'نظّف الحديقة',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          // Game Stats
+                          Text(
+                            'المستوى: $currentLevel/5',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          if (bestTime != null)
+                            Text(
+                              'أفضل وقت: ${GameService.formatTime(bestTime)}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          const SizedBox(height: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.25),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              currentLevel > 1 ? 'متابعة اللعب' : 'اضغط للعب',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<Map<String, dynamic>> _getGameStats() async {
+    final currentLevel = await GameService.getCurrentLevel();
+    final bestTime = await GameService.getBestCompletionTime();
+    
+    return {
+      'currentLevel': currentLevel,
+      'bestTime': bestTime,
+    };
+  }
+
   Widget _buildModernFAB(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
@@ -417,6 +558,117 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ),
             ),
           ],
+        );
+      },
+    );
+  }
+
+  Widget _buildHighScoresSection(BuildContext context, ColorScheme colorScheme) {
+    return FutureBuilder<List<GameScore>>(
+      future: GameService.getHighScores(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        final scores = snapshot.data!.take(5).toList();
+        
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                colorScheme.primary.withOpacity(0.1),
+                colorScheme.secondary.withOpacity(0.05),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: colorScheme.primary.withOpacity(0.3),
+              width: 2,
+            ),
+          ),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text('🏆', style: TextStyle(fontSize: 32)),
+                  const SizedBox(width: 12),
+                  Text(
+                    'أفضل النتائج',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.primary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              ...scores.asMap().entries.map((entry) {
+                final index = entry.key;
+                final score = entry.value;
+                final medalEmoji = index == 0 ? '🥇' : index == 1 ? '🥈' : index == 2 ? '🥉' : '🏅';
+                
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Text(
+                        medalEmoji,
+                        style: const TextStyle(fontSize: 24),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${score.score} نقطة',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              'الوقت: ${GameService.formatTime(score.completionTimeSeconds)}',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        '#${index + 1}',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ],
+          ),
         );
       },
     );

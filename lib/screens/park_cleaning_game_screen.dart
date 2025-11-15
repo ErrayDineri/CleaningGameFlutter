@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import 'dart:async';
+import '../services/game_service.dart';
 
 enum TrashType {
   plastic,
@@ -65,8 +67,8 @@ class ParkCleaningGameScreen extends StatefulWidget {
 
 class _ParkCleaningGameScreenState extends State<ParkCleaningGameScreen>
     with TickerProviderStateMixin {
-  late List<TrashItem> trashItems;
-  late List<RecyclingBin> recyclingBins;
+  List<TrashItem> trashItems = [];
+  List<RecyclingBin> recyclingBins = [];
   int score = 0;
   int currentLevel = 1;
   int maxLevel = 5;
@@ -76,11 +78,18 @@ class _ParkCleaningGameScreenState extends State<ParkCleaningGameScreen>
   late AnimationController _birdController;
   late Animation<double> _celebrationAnimation;
   late Animation<double> _birdAnimation;
+  
+  // Timer variables
+  Timer? _gameTimer;
+  int _timeRemaining = 60; // 60 seconds per level
+  
+  // Game tracking variables
+  DateTime? _gameStartTime;
 
   @override
   void initState() {
     super.initState();
-    _initializeGame();
+    _initializeGameAsync();
     
     _celebrationController = AnimationController(
       duration: const Duration(seconds: 2),
@@ -105,11 +114,30 @@ class _ParkCleaningGameScreenState extends State<ParkCleaningGameScreen>
   void dispose() {
     _celebrationController.dispose();
     _birdController.dispose();
+    _gameTimer?.cancel();
     super.dispose();
   }
 
+  Future<void> _initializeGameAsync() async {
+    // Load saved level
+    currentLevel = await GameService.getCurrentLevel();
+    
+    // Load game start time if exists
+    _gameStartTime = await GameService.getGameStartTime();
+    
+    // If starting from level 1 and no game start time, record it
+    if (currentLevel == 1 && _gameStartTime == null) {
+      _gameStartTime = DateTime.now();
+      await GameService.saveGameStartTime(_gameStartTime!);
+    }
+    
+    setState(() {
+      _initializeGame();
+    });
+  }
+
   void _initializeGame() {
-    // Initialize recycling bins
+    // Initialize recycling bins based on level
     recyclingBins = [
       RecyclingBin(
         type: TrashType.plastic,
@@ -125,61 +153,242 @@ class _ParkCleaningGameScreenState extends State<ParkCleaningGameScreen>
         color: Colors.green,
         position: const Offset(150, 500),
       ),
-      RecyclingBin(
+    ];
+    
+    // Add metal bin only from level 2 onwards
+    if (currentLevel >= 2) {
+      recyclingBins.add(RecyclingBin(
         type: TrashType.metal,
         emoji: '🗂️',
         label: 'المعدن',
         color: Colors.grey,
         position: const Offset(250, 500),
-      ),
-    ];
+      ));
+    }
 
     // Initialize trash items based on current level
     trashItems = _generateTrashForLevel(currentLevel);
     levelComplete = false;
+    
+    // Start level timer
+    _startTimer();
+  }
+
+  void _startTimer() {
+    _timeRemaining = 60; // 60 seconds per level
+    _gameTimer?.cancel();
+    
+    _gameTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      setState(() {
+        if (_timeRemaining > 0 && !levelComplete && !gameComplete) {
+          _timeRemaining--;
+        } else if (_timeRemaining <= 0) {
+          timer.cancel();
+          _handleTimeUp();
+        }
+      });
+    });
+  }
+
+  void _handleTimeUp() {
+    _gameTimer?.cancel();
+    if (!levelComplete) {
+      _showGameOverDialog();
+    }
+  }
+
+  void _showGameOverDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Column(
+            children: [
+              Text('⏰', style: TextStyle(fontSize: 48)),
+              SizedBox(height: 8),
+              Text(
+                'انتهى الوقت!',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'للأسف، لم تكمل المستوى في الوقت المحدد',
+                style: TextStyle(fontSize: 16),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'النقاط: $score',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.orange,
+                ),
+              ),
+              Text(
+                'المستوى: $currentLevel',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                await _resetGameAfterTimeUp();
+              },
+              style: TextButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text(
+                'ابدأ من جديد',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                Navigator.of(context).pop();
+              },
+              style: TextButton.styleFrom(
+                backgroundColor: Colors.grey,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text(
+                'العودة للقائمة',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+          actionsAlignment: MainAxisAlignment.spaceEvenly,
+        );
+      },
+    );
+  }
+
+  Future<void> _resetGameAfterTimeUp() async {
+    await GameService.resetCurrentLevel();
+    await GameService.clearGameStartTime();
+    
+    setState(() {
+      currentLevel = 1;
+      score = 0;
+      gameComplete = false;
+      levelComplete = false;
+      _gameStartTime = DateTime.now();
+    });
+    
+    // Save new game start time
+    await GameService.saveGameStartTime(_gameStartTime!);
+    
+    setState(() {
+      _initializeGame();
+    });
   }
 
   List<TrashItem> _generateTrashForLevel(int level) {
     List<TrashItem> items = [];
     
-    // Base trash items
-    List<Map<String, dynamic>> trashTemplates = [
-      {'type': TrashType.plastic, 'emoji': '🥤'},
-      {'type': TrashType.plastic, 'emoji': '🍼'},
-      {'type': TrashType.paper, 'emoji': '📄'},
-      {'type': TrashType.paper, 'emoji': '🗞️'},
-      {'type': TrashType.metal, 'emoji': '🥫'},
-      {'type': TrashType.metal, 'emoji': '⚙️'},
-    ];
-
-    // Additional items for higher levels
-    List<Map<String, dynamic>> advancedTrash = [
-      {'type': TrashType.plastic, 'emoji': '🧴'},
-      {'type': TrashType.plastic, 'emoji': '🥛'},
-      {'type': TrashType.paper, 'emoji': '📰'},
-      {'type': TrashType.paper, 'emoji': '📋'},
-      {'type': TrashType.metal, 'emoji': '�'},
-      {'type': TrashType.metal, 'emoji': '📎'},
-    ];
-
-    // Level 1-2: Base items (6 items)
-    int itemCount = 6;
-    List<Map<String, dynamic>> availableTrash = [...trashTemplates];
-
-    // Level 3-4: Add more items (8-10 items)
-    if (level >= 3) {
-      itemCount = 8 + (level - 3);
-      availableTrash.addAll(advancedTrash);
+    // Progressive level system: Each level increases difficulty
+    int itemCount;
+    List<Map<String, dynamic>> levelTrash;
+    
+    switch (level) {
+      case 1:
+        itemCount = 4;
+        levelTrash = [
+          {'type': TrashType.plastic, 'emoji': '🥤'},
+          {'type': TrashType.plastic, 'emoji': '🍼'},
+          {'type': TrashType.paper, 'emoji': '📄'},
+          {'type': TrashType.paper, 'emoji': '🗞️'},
+        ];
+        break;
+      case 2:
+        itemCount = 6;
+        levelTrash = [
+          {'type': TrashType.plastic, 'emoji': '🥤'},
+          {'type': TrashType.plastic, 'emoji': '🍼'},
+          {'type': TrashType.paper, 'emoji': '📄'},
+          {'type': TrashType.paper, 'emoji': '🗞️'},
+          {'type': TrashType.metal, 'emoji': '🥫'},
+          {'type': TrashType.metal, 'emoji': '⚙️'},
+        ];
+        break;
+      case 3:
+        itemCount = 8;
+        levelTrash = [
+          {'type': TrashType.plastic, 'emoji': '🥤'},
+          {'type': TrashType.plastic, 'emoji': '🍼'},
+          {'type': TrashType.plastic, 'emoji': '🧴'},
+          {'type': TrashType.paper, 'emoji': '📄'},
+          {'type': TrashType.paper, 'emoji': '🎫'},
+          {'type': TrashType.paper, 'emoji': '📃'},
+          {'type': TrashType.metal, 'emoji': '🥫'},
+          {'type': TrashType.metal, 'emoji': '⚙️'},
+        ];
+        break;
+      case 4:
+        itemCount = 10;
+        levelTrash = [
+          {'type': TrashType.plastic, 'emoji': '🥤'},
+          {'type': TrashType.plastic, 'emoji': '🍼'},
+          {'type': TrashType.plastic, 'emoji': '🧴'},
+          {'type': TrashType.plastic, 'emoji': '🥛'},
+          {'type': TrashType.paper, 'emoji': '📄'},
+          {'type': TrashType.paper, 'emoji': '🗞️'},
+          {'type': TrashType.paper, 'emoji': '📰'},
+          {'type': TrashType.paper, 'emoji': '📋'},
+          {'type': TrashType.metal, 'emoji': '🥫'},
+          {'type': TrashType.metal, 'emoji': '⚙️'},
+        ];
+        break;
+      default: // Level 5 and beyond
+        itemCount = 12;
+        levelTrash = [
+          {'type': TrashType.plastic, 'emoji': '🥤'},
+          {'type': TrashType.plastic, 'emoji': '🍼'},
+          {'type': TrashType.plastic, 'emoji': '🧴'},
+          {'type': TrashType.plastic, 'emoji': '🥛'},
+          {'type': TrashType.paper, 'emoji': '📄'},
+          {'type': TrashType.paper, 'emoji': '🗞️'},
+          {'type': TrashType.paper, 'emoji': '📰'},
+          {'type': TrashType.paper, 'emoji': '📋'},
+          {'type': TrashType.metal, 'emoji': '🥫'},
+          {'type': TrashType.metal, 'emoji': '⚙️'},
+          {'type': TrashType.metal, 'emoji': '🔧'},
+          {'type': TrashType.metal, 'emoji': '📎'},
+        ];
+        break;
     }
 
-    // Level 5: Maximum challenge (12 items)
-    if (level >= 5) {
-      itemCount = 12;
-    }
-
-    // Generate items
+    // Generate items using level-specific trash
     for (int i = 0; i < itemCount; i++) {
-      final template = availableTrash[i % availableTrash.length];
+      final template = levelTrash[i % levelTrash.length];
       items.add(TrashItem(
         id: '${template['type'].toString()}_${i}',
         type: template['type'],
@@ -199,17 +408,21 @@ class _ParkCleaningGameScreenState extends State<ParkCleaningGameScreen>
     );
   }
 
-  void _checkGameComplete() {
+  void _checkGameComplete() async {
     if (trashItems.every((item) => item.isCollected)) {
       setState(() {
         levelComplete = true;
       });
       
+      // Stop timer when level is complete
+      _gameTimer?.cancel();
+      
       if (currentLevel < maxLevel) {
         // Level complete, show next level option
         _showLevelCompleteDialog();
       } else {
-        // All levels complete
+        // All levels complete - save high score
+        await _saveHighScore();
         setState(() {
           gameComplete = true;
         });
@@ -218,22 +431,54 @@ class _ParkCleaningGameScreenState extends State<ParkCleaningGameScreen>
     }
   }
 
-  void _nextLevel() {
+  void _nextLevel() async {
     setState(() {
       currentLevel++;
+    });
+    
+    // Save current level progress
+    await GameService.saveCurrentLevel(currentLevel);
+    
+    setState(() {
       _initializeGame();
     });
   }
 
-  void _resetGame() {
+  void _resetGame() async {
     setState(() {
       score = 0;
       currentLevel = 1;
       gameComplete = false;
       levelComplete = false;
+    });
+    
+    // Reset saved progress
+    await GameService.resetCurrentLevel();
+    await GameService.clearGameStartTime();
+    
+    // Start new game timer
+    _gameStartTime = DateTime.now();
+    await GameService.saveGameStartTime(_gameStartTime!);
+    
+    setState(() {
       _initializeGame();
     });
     _celebrationController.reset();
+  }
+
+  Future<void> _saveHighScore() async {
+    if (_gameStartTime != null) {
+      final completionTime = DateTime.now().difference(_gameStartTime!).inSeconds;
+      final gameScore = GameScore(
+        score: score,
+        completionTimeSeconds: completionTime,
+        completedAt: DateTime.now(),
+      );
+      
+      await GameService.saveHighScore(gameScore);
+      await GameService.clearGameStartTime();
+      await GameService.resetCurrentLevel();
+    }
   }
 
   void _dismissCurrentSnackBar() {
@@ -353,12 +598,13 @@ class _ParkCleaningGameScreenState extends State<ParkCleaningGameScreen>
       top: 20,
       left: 20,
       right: 20,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // Back button
-          GestureDetector(
-            onTap: () => Navigator.of(context).pop(),
+      child: SafeArea(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            // Back button
+            GestureDetector(
+              onTap: () => Navigator.of(context).pop(),
             child: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -381,41 +627,46 @@ class _ParkCleaningGameScreenState extends State<ParkCleaningGameScreen>
           ),
           
           // Title and Level
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.9),
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '🧹 نظّف الحديقة',
-                  style: TextStyle(
-                    color: colorScheme.primary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+          Flexible(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.9),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
                   ),
-                ),
-                Text(
-                  'المستوى $currentLevel',
-                  style: TextStyle(
-                    color: colorScheme.primary.withOpacity(0.7),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '🧹 نظّف الحديقة',
+                    style: TextStyle(
+                      color: colorScheme.primary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-              ],
+                  Text(
+                    'المستوى $currentLevel',
+                    style: TextStyle(
+                      color: colorScheme.primary.withOpacity(0.7),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
+          
+          const SizedBox(width: 8),
           
           // Score
           Container(
@@ -440,7 +691,45 @@ class _ParkCleaningGameScreenState extends State<ParkCleaningGameScreen>
               ),
             ),
           ),
+          
+          // Timer
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: _timeRemaining <= 10 && _timeRemaining > 0
+                  ? Colors.red.withOpacity(0.9)
+                  : Colors.orange.withOpacity(0.9),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.timer,
+                  color: Colors.white,
+                  size: 18,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '${_timeRemaining}s',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
+        ),
       ),
     );
   }
@@ -545,18 +834,30 @@ class _ParkCleaningGameScreenState extends State<ParkCleaningGameScreen>
             
             _checkGameComplete();
           } else {
+            // Decrease timer by 5 seconds for wrong placement
+            setState(() {
+              _timeRemaining = math.max(0, _timeRemaining - 5);
+            });
+            
+            // Check if time is up due to penalty
+            if (_timeRemaining <= 0) {
+              _gameTimer?.cancel();
+              _handleTimeUp();
+              return;
+            }
+            
             // Show error feedback
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: const Text(
-                  '❌ حاول مرة أخرى! ضع القمامة في السلة المناسبة',
+                  '❌ خطأ! -5 ثوان • ضع القمامة في السلة المناسبة',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                backgroundColor: Colors.orange,
+                backgroundColor: Colors.red,
                 duration: const Duration(seconds: 3),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -760,6 +1061,81 @@ class _ParkCleaningGameScreenState extends State<ParkCleaningGameScreen>
                         fontWeight: FontWeight.bold,
                         color: Colors.blue,
                       ),
+                    ),
+                    if (_gameStartTime != null)
+                      Text(
+                        'الوقت: ${GameService.formatTime(DateTime.now().difference(_gameStartTime!).inSeconds)}',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.orange,
+                        ),
+                      ),
+                    const SizedBox(height: 16),
+                    // High Scores Section
+                    FutureBuilder<List<GameScore>>(
+                      future: GameService.getHighScores(),
+                      builder: (context, snapshot) {
+                        if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+                          final scores = snapshot.data!.take(5).toList();
+                          return Container(
+                            constraints: const BoxConstraints(maxHeight: 200, maxWidth: 300),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Text(
+                                  '🏆 أفضل النتائج',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Flexible(
+                                  child: SingleChildScrollView(
+                                    child: Column(
+                                      children: scores.asMap().entries.map((entry) {
+                                        final index = entry.key;
+                                        final score = entry.value;
+                                        return Padding(
+                                          padding: const EdgeInsets.symmetric(vertical: 2),
+                                          child: Row(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Text(
+                                                '${index + 1}.',
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                '${score.score} نقطة',
+                                                style: const TextStyle(fontSize: 12),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                GameService.formatTime(score.completionTimeSeconds),
+                                                style: const TextStyle(
+                                                  fontSize: 11,
+                                                  color: Colors.grey,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      }).toList(),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+                        return const SizedBox.shrink();
+                      },
                     ),
                     const SizedBox(height: 24),
                     Row(
