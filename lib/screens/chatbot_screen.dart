@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 import '../services/chat_api_service.dart';
 
 class Message {
@@ -13,6 +15,20 @@ class Message {
     required this.timestamp,
     this.isStreaming = false,
   });
+
+  // Convert to JSON for persistence
+  Map<String, dynamic> toJson() => {
+        'text': text,
+        'isUser': isUser,
+        'timestamp': timestamp.toIso8601String(),
+      };
+
+  // Create from JSON
+  factory Message.fromJson(Map<String, dynamic> json) => Message(
+        text: json['text'],
+        isUser: json['isUser'],
+        timestamp: DateTime.parse(json['timestamp']),
+      );
 }
 
 class ChatbotScreen extends StatefulWidget {
@@ -26,7 +42,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   final TextEditingController _messageController = TextEditingController();
   final List<Message> _messages = [];
   bool _isLoading = false;
-  final ScrollController _scrollController = ScrollController();
+  late final ScrollController _scrollController;
   String _streamingText = '';
   
   // System context for the chatbot
@@ -47,14 +63,125 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   @override
   void initState() {
     super.initState();
-    // Add welcome message
-    _messages.add(
-      Message(
-        text: 'مرحباً! 👋 أنا مساعدك الذكي في لعبة التنظيف، كيف يمكنني مساعدتك اليوم؟',
-        isUser: false,
-        timestamp: DateTime.now(),
+    _scrollController = ScrollController();
+    _loadChatHistory();
+  }
+
+  // Load chat history from SharedPreferences
+  Future<void> _loadChatHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    final historyJson = prefs.getString('chat_history');
+    
+    if (historyJson != null && historyJson.isNotEmpty) {
+      try {
+        final List<dynamic> decoded = jsonDecode(historyJson);
+        setState(() {
+          _messages.clear();
+          _messages.addAll(decoded.map((json) => Message.fromJson(json)).toList());
+        });
+      } catch (e) {
+        print('Error loading chat history: $e');
+        _addWelcomeMessage();
+      }
+    } else {
+      _addWelcomeMessage();
+    }
+    
+    // Scroll to bottom after loading
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+  }
+
+  // Save chat history to SharedPreferences
+  Future<void> _saveChatHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    final historyJson = jsonEncode(
+      _messages.where((m) => !m.isStreaming).map((m) => m.toJson()).toList(),
+    );
+    await prefs.setString('chat_history', historyJson);
+  }
+
+  // Clear chat history
+  Future<void> _clearChatHistory() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text(
+          'مسح المحادثة',
+          textAlign: TextAlign.right,
+          style: TextStyle(fontFamily: 'Cairo'),
+        ),
+        content: const Text(
+          'هل أنت متأكد من حذف جميع الرسائل؟ سيتم مسح ذاكرة المحادثة بالكامل.',
+          textAlign: TextAlign.right,
+          style: TextStyle(fontFamily: 'Cairo'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text(
+              'إلغاء',
+              style: TextStyle(fontFamily: 'Cairo'),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
+            child: const Text(
+              'مسح',
+              style: TextStyle(fontFamily: 'Cairo'),
+            ),
+          ),
+        ],
       ),
     );
+
+    if (confirmed == true) {
+      // Clear from storage
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('chat_history');
+      
+      // Clear from memory (this wipes the conversation context)
+      setState(() {
+        _messages.clear();
+        _streamingText = '';
+        _isLoading = false;
+      });
+      
+      // Start fresh with welcome message
+      _addWelcomeMessage();
+      
+      // Show confirmation snackbar
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'تم مسح المحادثة بنجاح ✓',
+              textAlign: TextAlign.right,
+              style: TextStyle(fontFamily: 'Cairo'),
+            ),
+            backgroundColor: const Color(0xFF27AE60),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  // Add welcome message
+  void _addWelcomeMessage() {
+    setState(() {
+      _messages.add(
+        Message(
+          text: 'مرحباً! 👋\n\nأنا هنا لمساعدتك في تعلم كيفية الحفاظ على البيئة وإعادة التدوير بشكل صحيح.\n\nكيف يمكنني مساعدتك اليوم؟',
+          isUser: false,
+          timestamp: DateTime.now(),
+        ),
+      );
+    });
+    _saveChatHistory();
   }
 
   @override
@@ -82,6 +209,9 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
 
     _messageController.clear();
     _scrollToBottom();
+
+    // Save after adding user message
+    _saveChatHistory();
 
     // Call streaming API
     _streamChatbotResponse(userMessage);
@@ -170,6 +300,9 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
           }
           _isLoading = false;
           _streamingText = '';
+          
+          // Save after receiving bot response
+          _saveChatHistory();
         });
       }
     } catch (e) {
@@ -186,6 +319,9 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
           );
           _isLoading = false;
           _streamingText = '';
+          
+          // Save even error messages
+          _saveChatHistory();
         });
       }
     }
@@ -293,6 +429,27 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                         size: 28,
                       ),
                     ),
+                    const Spacer(),
+                    // Clear chat button
+                    GestureDetector(
+                      onTap: _messages.isEmpty ? null : _clearChatHistory,
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: _messages.isEmpty 
+                              ? Colors.white.withOpacity(0.1)
+                              : Colors.white.withOpacity(0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.delete_sweep,
+                          color: _messages.isEmpty 
+                              ? Colors.white.withOpacity(0.3)
+                              : Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                    ),
                     const SizedBox(width: 12),
                     GestureDetector(
                       onTap: () => Navigator.of(context).pop(),
@@ -343,7 +500,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                               ),
                               child: Row(
                                 mainAxisAlignment:
-                                    MainAxisAlignment.start,
+                                    MainAxisAlignment.end,
                                 children: [
                                   Container(
                                     padding: const EdgeInsets.symmetric(
@@ -363,6 +520,17 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                                     ),
                                     child: Row(
                                       children: [
+                                        Text(
+                                          'جاري الكتابة...',
+                                          style: TextStyle(
+                                            color:
+                                                colorScheme.primary,
+                                            fontSize: 13,
+                                            fontWeight:
+                                                FontWeight.w600,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
                                         SizedBox(
                                           width: 16,
                                           height: 16,
@@ -374,17 +542,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                                                     Color>(
                                               colorScheme.primary,
                                             ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 10),
-                                        Text(
-                                          'جاري الكتابة...',
-                                          style: TextStyle(
-                                            color:
-                                                colorScheme.primary,
-                                            fontSize: 13,
-                                            fontWeight:
-                                                FontWeight.w600,
                                           ),
                                         ),
                                       ],
@@ -521,11 +678,11 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         mainAxisAlignment: message.isUser
-            ? MainAxisAlignment.end
-            : MainAxisAlignment.start,
+            ? MainAxisAlignment.start
+            : MainAxisAlignment.end,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          if (!message.isUser) ...[
+          if (message.isUser) ...[
             Container(
               width: 32,
               height: 32,
@@ -545,7 +702,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                 ),
               ),
               child: Icon(
-                Icons.support_agent,
+                Icons.person_rounded,
                 size: 18,
                 color: colorScheme.primary,
               ),
@@ -586,20 +743,22 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                 children: [
                   Text(
                     message.text,
-                    textAlign:
-                        message.isUser ? TextAlign.right : TextAlign.left,
+                    textDirection: TextDirection.rtl,
+                    textAlign: TextAlign.right,
                     style: TextStyle(
                       color: message.isUser
                           ? Colors.white
                           : Colors.black,
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
-                      height: 1.3,
+                      height: 1.5,
+                      letterSpacing: 0.3,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     _formatTime(message.timestamp),
+                    textDirection: TextDirection.rtl,
                     style: TextStyle(
                       color: message.isUser
                           ? Colors.white70
@@ -612,7 +771,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
               ),
             ),
           ),
-          if (message.isUser) ...[
+          if (!message.isUser) ...[
             const SizedBox(width: 8),
             Container(
               width: 32,
@@ -633,7 +792,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                 ),
               ),
               child: Icon(
-                Icons.person_rounded,
+                Icons.support_agent,
                 size: 18,
                 color: colorScheme.primary,
               ),

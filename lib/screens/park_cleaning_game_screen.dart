@@ -85,6 +85,10 @@ class _ParkCleaningGameScreenState extends State<ParkCleaningGameScreen>
   
   // Game tracking variables
   DateTime? _gameStartTime;
+  
+  // Screen dimensions for relative positioning
+  double _screenWidth = 0;
+  double _screenHeight = 0;
 
   @override
   void initState() {
@@ -137,21 +141,31 @@ class _ParkCleaningGameScreenState extends State<ParkCleaningGameScreen>
   }
 
   void _initializeGame() {
-    // Initialize recycling bins based on level
+    // Get screen dimensions if available
+    if (context.mounted) {
+      _screenWidth = MediaQuery.of(context).size.width;
+      _screenHeight = MediaQuery.of(context).size.height;
+    }
+    
+    // Initialize recycling bins based on level - centered at bottom (relative positioning)
+    final binY = _screenHeight * 0.80; // 80% down the screen
+    final binSpacing = _screenWidth * 0.25; // 25% of screen width spacing
+    final startX = (_screenWidth - (binSpacing * (currentLevel >= 2 ? 2 : 1))) / 2; // Center the bins
+    
     recyclingBins = [
       RecyclingBin(
         type: TrashType.plastic,
         emoji: '♻️',
         label: 'البلاستيك',
         color: Colors.blue,
-        position: const Offset(50, 500),
+        position: Offset(startX, binY),
       ),
       RecyclingBin(
         type: TrashType.paper,
         emoji: '📄',
         label: 'الورق',
         color: Colors.green,
-        position: const Offset(150, 500),
+        position: Offset(startX + binSpacing, binY),
       ),
     ];
     
@@ -162,7 +176,7 @@ class _ParkCleaningGameScreenState extends State<ParkCleaningGameScreen>
         emoji: '🗂️',
         label: 'المعدن',
         color: Colors.grey,
-        position: const Offset(250, 500),
+        position: Offset(startX + binSpacing * 2, binY),
       ));
     }
 
@@ -402,9 +416,16 @@ class _ParkCleaningGameScreenState extends State<ParkCleaningGameScreen>
 
   Offset _getRandomPosition() {
     final random = math.Random();
+    
+    // Use relative positioning based on screen size
+    final playAreaWidth = _screenWidth * 0.7; // 70% of screen width
+    final playAreaHeight = _screenHeight * 0.5; // 50% of screen height
+    final startX = _screenWidth * 0.15; // Start 15% from left (centers the play area)
+    final startY = _screenHeight * 0.2; // Start 20% from top
+    
     return Offset(
-      50 + random.nextDouble() * 250, // x: 50-300
-      150 + random.nextDouble() * 200, // y: 150-350
+      startX + random.nextDouble() * playAreaWidth,
+      startY + random.nextDouble() * playAreaHeight,
     );
   }
 
@@ -496,9 +517,12 @@ class _ParkCleaningGameScreenState extends State<ParkCleaningGameScreen>
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Colors.lightBlue[100]!,
-              Colors.green[100]!,
+              const Color(0xFF87CEEB), // Sky blue
+              const Color(0xFFB0E0E6), // Powder blue
+              const Color(0xFFC1E1C1), // Light mint green
+              const Color(0xFF90EE90), // Light green
             ],
+            stops: const [0.0, 0.3, 0.6, 1.0],
           ),
         ),
         child: SafeArea(
@@ -530,32 +554,180 @@ class _ParkCleaningGameScreenState extends State<ParkCleaningGameScreen>
   Widget _buildBackground() {
     return Stack(
       children: [
-        // Grass
-        Positioned.fill(
+        // Animated clouds
+        Positioned(
+          top: 40,
+          left: 50,
+          child: AnimatedBuilder(
+            animation: _birdAnimation,
+            builder: (context, child) {
+              return Transform.translate(
+                offset: Offset(_birdAnimation.value, 0),
+                child: Opacity(
+                  opacity: 0.7,
+                  child: Text(
+                    '☁️',
+                    style: TextStyle(fontSize: 50),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        Positioned(
+          top: 80,
+          right: 80,
+          child: AnimatedBuilder(
+            animation: _birdAnimation,
+            builder: (context, child) {
+              return Transform.translate(
+                offset: Offset(-_birdAnimation.value * 0.7, 0),
+                child: Opacity(
+                  opacity: 0.6,
+                  child: Text(
+                    '☁️',
+                    style: TextStyle(fontSize: 40),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        Positioned(
+          top: 120,
+          left: 150,
+          child: AnimatedBuilder(
+            animation: _birdAnimation,
+            builder: (context, child) {
+              return Transform.translate(
+                offset: Offset(_birdAnimation.value * 0.5, 0),
+                child: Opacity(
+                  opacity: 0.5,
+                  child: Text(
+                    '☁️',
+                    style: TextStyle(fontSize: 35),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        
+        // Sun
+        Positioned(
+          top: 30,
+          right: 30,
+          child: Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  Colors.yellow[300]!,
+                  Colors.orange[300]!,
+                ],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.yellow.withOpacity(0.5),
+                  blurRadius: 30,
+                  spreadRadius: 10,
+                ),
+              ],
+            ),
+            child: Center(
+              child: Text(
+                '☀️',
+                style: TextStyle(fontSize: 40),
+              ),
+            ),
+          ),
+        ),
+        
+        // Ground/Grass layer with texture
+        Positioned(
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: 150,
           child: Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  Colors.lightBlue[200]!,
-                  Colors.green[200]!,
+                  const Color(0xFF7CB342), // Medium green
+                  const Color(0xFF558B2F), // Darker green
                 ],
               ),
+            ),
+            child: Stack(
+              children: [
+                // Grass texture with small flowers
+                ...List.generate(15, (index) {
+                  final random = math.Random(index);
+                  return Positioned(
+                    left: random.nextDouble() * 400,
+                    bottom: random.nextDouble() * 120,
+                    child: Text(
+                      ['🌼', '🌸', '🌺', '🌻'][random.nextInt(4)],
+                      style: TextStyle(fontSize: 20 + random.nextDouble() * 15),
+                    ),
+                  );
+                }),
+              ],
             ),
           ),
         ),
         
-        // Trees
-        const Positioned(
-          top: 80,
+        // Trees and bushes
+        Positioned(
           left: 20,
+          bottom: 120,
+          child: Text('🌳', style: TextStyle(fontSize: 70)),
+        ),
+        Positioned(
+          right: 30,
+          bottom: 120,
+          child: Text('🌲', style: TextStyle(fontSize: 65)),
+        ),
+        Positioned(
+          left: 120,
+          bottom: 130,
           child: Text('🌳', style: TextStyle(fontSize: 60)),
         ),
-        const Positioned(
-          top: 100,
-          right: 30,
-          child: Text('🌲', style: TextStyle(fontSize: 50)),
+        Positioned(
+          right: 150,
+          bottom: 125,
+          child: Text('🌲', style: TextStyle(fontSize: 55)),
+        ),
+        
+        // Bushes
+        Positioned(
+          left: 80,
+          bottom: 110,
+          child: Text('🌿', style: TextStyle(fontSize: 40)),
+        ),
+        Positioned(
+          right: 100,
+          bottom: 105,
+          child: Text('🌿', style: TextStyle(fontSize: 35)),
+        ),
+        
+        // Flying birds (animated)
+        AnimatedBuilder(
+          animation: _birdAnimation,
+          builder: (context, child) {
+            return Positioned(
+              top: 150 + _birdAnimation.value * 0.3,
+              left: 200 + _birdAnimation.value * 2,
+              child: Transform.rotate(
+                angle: math.sin(_birdAnimation.value / 10) * 0.1,
+                child: Text('🦅', style: TextStyle(fontSize: 30)),
+              ),
+            );
+          },
         ),
         
         // Flowers (appear when game is complete)
