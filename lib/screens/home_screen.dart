@@ -156,12 +156,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           ),
                       textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 30),
-                    
-                    // High Scores Section
-                    _buildHighScoresSection(context, colorScheme),
-                    
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 40),
 
                     // Games Grid with modern cards
                     Text(
@@ -343,7 +338,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return FutureBuilder<Map<String, dynamic>>(
       future: _getGameStats(),
       builder: (context, snapshot) {
-        final currentLevel = snapshot.data?['currentLevel'] ?? 1;
         final bestTime = snapshot.data?['bestTime'];
         
         return GestureDetector(
@@ -420,23 +414,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             ),
                           ),
                           const SizedBox(height: 4),
-                          // Game Stats
-                          Text(
-                            'المستوى: $currentLevel/5',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
+                          // Game Stats - Only show best time
                           if (bestTime != null)
                             Text(
                               'أفضل وقت: ${GameService.formatTime(bestTime)}',
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w500,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
                               ),
                               textAlign: TextAlign.center,
                             ),
@@ -450,8 +435,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               color: Colors.white.withOpacity(0.25),
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: Text(
-                              currentLevel > 1 ? 'متابعة اللعب' : 'اضغط للعب',
+                            child: const Text(
+                              'اضغط للعب',
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 10,
@@ -474,11 +459,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Future<Map<String, dynamic>> _getGameStats() async {
-    final currentLevel = await GameService.getCurrentLevel();
+    final highScores = await GameService.getHighScores();
+    final highestScore = highScores.isNotEmpty ? highScores.first.score : null;
     final bestTime = await GameService.getBestCompletionTime();
     
     return {
-      'currentLevel': currentLevel,
+      'highestScore': highestScore,
       'bestTime': bestTime,
     };
   }
