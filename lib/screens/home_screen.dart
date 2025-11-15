@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'chatbot_screen.dart';
 import 'park_cleaning_game_screen.dart';
+import 'water_game_screen.dart';
 import '../services/game_service.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -176,16 +177,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       crossAxisSpacing: 20,
                       children: [
                         _buildParkGameCard(context, delay: 0),
-                        _buildGameCard(
-                          context,
-                          title: 'اللعبة الثانية',
-                          emoji: '✨',
-                          gradient: [
-                            const Color(0xFF229954),
-                            const Color(0xFF186A3B),
-                          ],
-                          delay: 100,
-                        ),
+                        _buildWaterGameCard(context, delay: 100),
                         _buildGameCard(
                           context,
                           title: 'اللعبة الثالثة',
@@ -336,17 +328,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Widget _buildParkGameCard(BuildContext context, {required int delay}) {
     return FutureBuilder<Map<String, dynamic>>(
-      future: _getGameStats(),
+      future: _getParkGameStats(),
       builder: (context, snapshot) {
+        final highestScore = snapshot.data?['highestScore'];
         final bestTime = snapshot.data?['bestTime'];
         
         return GestureDetector(
-          onTap: () {
-            Navigator.of(context).push(
+          onTap: () async {
+            await Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (context) => const ParkCleaningGameScreen(),
               ),
             );
+            setState(() {});
           },
           child: Card(
             elevation: 12,
@@ -414,17 +408,50 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             ),
                           ),
                           const SizedBox(height: 4),
-                          // Game Stats - Only show best time
-                          if (bestTime != null)
-                            Text(
-                              'أفضل وقت: ${GameService.formatTime(bestTime)}',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
+                          // Game Stats - Show highest score and best time, or "لم تلعب بعد"
+                          if (highestScore == null && bestTime == null)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
                               ),
-                              textAlign: TextAlign.center,
-                            ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Text(
+                                'لم تلعب بعد',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            )
+                          else ...[
+                            if (highestScore != null)
+                              Text(
+                                'أعلى نتيجة: $highestScore',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            if (bestTime != null)
+                              Text(
+                                'أفضل وقت: ${GameService.formatTime(bestTime)}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                          ],
                           const SizedBox(height: 4),
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -458,14 +485,190 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  Future<Map<String, dynamic>> _getGameStats() async {
-    final highScores = await GameService.getHighScores();
-    final highestScore = highScores.isNotEmpty ? highScores.first.score : null;
-    final bestTime = await GameService.getBestCompletionTime();
+  Widget _buildWaterGameCard(BuildContext context, {required int delay}) {
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _getWaterGameStats(),
+      builder: (context, snapshot) {
+        final highestScore = snapshot.data?['highestScore'];
+        
+        return TweenAnimationBuilder(
+          tween: Tween<double>(begin: 0, end: 1),
+          duration: Duration(milliseconds: 500 + delay),
+          curve: Curves.easeOut,
+          builder: (context, double value, child) {
+            return Transform.scale(
+              scale: value,
+              child: Opacity(
+                opacity: value,
+                child: child,
+              ),
+            );
+          },
+          child: GestureDetector(
+            onTap: () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const WaterGameScreen(),
+                ),
+              );
+              setState(() {});
+            },
+            child: Card(
+              elevation: 12,
+              shadowColor: Colors.blue.withOpacity(0.4),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFF3498DB),
+                      Color(0xFF2874A6),
+                    ],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.blue.withOpacity(0.3),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Stack(
+                  children: [
+                    // Background pattern
+                    Positioned(
+                      top: -20,
+                      right: -20,
+                      child: Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                      color: Colors.white.withOpacity(0.1),
+                    ),
+                  ),
+                ),
+                // Content
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          '💧',
+                          style: TextStyle(fontSize: 48),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'المياه النقية',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'اجمع الماء النظيف فقط',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        // Highest score display or "لم تلعب بعد"
+                        if (highestScore == null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Text(
+                              'لم تلعب بعد',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                fontStyle: FontStyle.italic,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          )
+                        else
+                          Text(
+                            'أعلى نتيجة: $highestScore',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Text(
+                            'اضغط للعب',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+      },
+    );
+  }
+
+  Future<Map<String, dynamic>> _getParkGameStats() async {
+    final highestScore = await GameService.getParkGameHighestScore();
+    final bestTime = await GameService.getParkGameBestCompletionTime();
     
     return {
       'highestScore': highestScore,
       'bestTime': bestTime,
+    };
+  }
+
+  Future<Map<String, dynamic>> _getWaterGameStats() async {
+    final highestScore = await GameService.getWaterGameHighestScore();
+    
+    return {
+      'highestScore': highestScore,
     };
   }
 
@@ -544,117 +747,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ),
             ),
           ],
-        );
-      },
-    );
-  }
-
-  Widget _buildHighScoresSection(BuildContext context, ColorScheme colorScheme) {
-    return FutureBuilder<List<GameScore>>(
-      future: GameService.getHighScores(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const SizedBox.shrink();
-        }
-
-        final scores = snapshot.data!.take(5).toList();
-        
-        return Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                colorScheme.primary.withOpacity(0.1),
-                colorScheme.secondary.withOpacity(0.05),
-              ],
-            ),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: colorScheme.primary.withOpacity(0.3),
-              width: 2,
-            ),
-          ),
-          child: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text('🏆', style: TextStyle(fontSize: 32)),
-                  const SizedBox(width: 12),
-                  Text(
-                    'أفضل النتائج',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: colorScheme.primary,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              ...scores.asMap().entries.map((entry) {
-                final index = entry.key;
-                final score = entry.value;
-                final medalEmoji = index == 0 ? '🥇' : index == 1 ? '🥈' : index == 2 ? '🥉' : '🏅';
-                
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      Text(
-                        medalEmoji,
-                        style: const TextStyle(fontSize: 24),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '${score.score} نقطة',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            Text(
-                              'الوقت: ${GameService.formatTime(score.completionTimeSeconds)}',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Text(
-                        '#${index + 1}',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: colorScheme.primary,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-            ],
-          ),
         );
       },
     );

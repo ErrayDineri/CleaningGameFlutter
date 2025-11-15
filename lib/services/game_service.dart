@@ -30,48 +30,24 @@ class GameScore {
 }
 
 class GameService {
-  static const String _currentLevelKey = 'park_cleaning_current_level';
-  static const String _highScoresKey = 'park_cleaning_high_scores';
-  static const String _gameStartTimeKey = 'park_cleaning_game_start_time';
+  // Separate storage keys for each game
+  static const String _parkGameHighScoresKey = 'park_cleaning_high_scores';
+  static const String _waterGameHighScoresKey = 'water_game_high_scores';
 
-  // Save current level
-  static Future<void> saveCurrentLevel(int level) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_currentLevelKey, level);
+  // Save high score for Park Cleaning Game
+  static Future<void> saveParkGameHighScore(GameScore score) async {
+    await _saveHighScore(score, _parkGameHighScoresKey);
   }
 
-  // Get current level (default to 1)
-  static Future<int> getCurrentLevel() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getInt(_currentLevelKey) ?? 1;
+  // Save high score for Water Game
+  static Future<void> saveWaterGameHighScore(GameScore score) async {
+    await _saveHighScore(score, _waterGameHighScoresKey);
   }
 
-  // Save game start time
-  static Future<void> saveGameStartTime(DateTime startTime) async {
+  // Internal method to save high score
+  static Future<void> _saveHighScore(GameScore score, String storageKey) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_gameStartTimeKey, startTime.toIso8601String());
-  }
-
-  // Get game start time
-  static Future<DateTime?> getGameStartTime() async {
-    final prefs = await SharedPreferences.getInstance();
-    final timeString = prefs.getString(_gameStartTimeKey);
-    if (timeString != null) {
-      return DateTime.parse(timeString);
-    }
-    return null;
-  }
-
-  // Clear game start time
-  static Future<void> clearGameStartTime() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_gameStartTimeKey);
-  }
-
-  // Save high score
-  static Future<void> saveHighScore(GameScore score) async {
-    final prefs = await SharedPreferences.getInstance();
-    final scoresJson = prefs.getStringList(_highScoresKey) ?? [];
+    final scoresJson = prefs.getStringList(storageKey) ?? [];
     
     // Convert to GameScore objects
     List<GameScore> scores = scoresJson
@@ -98,22 +74,32 @@ class GameService {
     final updatedScoresJson = scores
         .map((score) => json.encode(score.toJson()))
         .toList();
-    await prefs.setStringList(_highScoresKey, updatedScoresJson);
+    await prefs.setStringList(storageKey, updatedScoresJson);
   }
 
-  // Get high scores
-  static Future<List<GameScore>> getHighScores() async {
+  // Get high scores for Park Cleaning Game
+  static Future<List<GameScore>> getParkGameHighScores() async {
+    return _getHighScores(_parkGameHighScoresKey);
+  }
+
+  // Get high scores for Water Game
+  static Future<List<GameScore>> getWaterGameHighScores() async {
+    return _getHighScores(_waterGameHighScoresKey);
+  }
+
+  // Internal method to get high scores
+  static Future<List<GameScore>> _getHighScores(String storageKey) async {
     final prefs = await SharedPreferences.getInstance();
-    final scoresJson = prefs.getStringList(_highScoresKey) ?? [];
+    final scoresJson = prefs.getStringList(storageKey) ?? [];
     
     return scoresJson
         .map((scoreJson) => GameScore.fromJson(json.decode(scoreJson)))
         .toList();
   }
 
-  // Get best completion time (fastest time among high scores)
-  static Future<int?> getBestCompletionTime() async {
-    final scores = await getHighScores();
+  // Get best completion time for Park Cleaning Game (fastest time among high scores)
+  static Future<int?> getParkGameBestCompletionTime() async {
+    final scores = await getParkGameHighScores();
     if (scores.isNotEmpty) {
       return scores
           .map((score) => score.completionTimeSeconds)
@@ -122,9 +108,22 @@ class GameService {
     return null;
   }
 
-  // Reset current level to 1
-  static Future<void> resetCurrentLevel() async {
-    await saveCurrentLevel(1);
+  // Get highest score for Park Cleaning Game
+  static Future<int?> getParkGameHighestScore() async {
+    final scores = await getParkGameHighScores();
+    if (scores.isNotEmpty) {
+      return scores.first.score; // Already sorted by score descending
+    }
+    return null;
+  }
+
+  // Get highest score for Water Game
+  static Future<int?> getWaterGameHighestScore() async {
+    final scores = await getWaterGameHighScores();
+    if (scores.isNotEmpty) {
+      return scores.first.score; // Already sorted by score descending
+    }
+    return null;
   }
 
   // Format time in MM:SS format
@@ -132,5 +131,23 @@ class GameService {
     final minutes = seconds ~/ 60;
     final remainingSeconds = seconds % 60;
     return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
+  }
+
+  // Deprecated - kept for backward compatibility, redirects to park game
+  @deprecated
+  static Future<void> saveHighScore(GameScore score) async {
+    await saveParkGameHighScore(score);
+  }
+
+  // Deprecated - kept for backward compatibility, redirects to park game
+  @deprecated
+  static Future<List<GameScore>> getHighScores() async {
+    return getParkGameHighScores();
+  }
+
+  // Deprecated - kept for backward compatibility, redirects to park game
+  @deprecated
+  static Future<int?> getBestCompletionTime() async {
+    return getParkGameBestCompletionTime();
   }
 }

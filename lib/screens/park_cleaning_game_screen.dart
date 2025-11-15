@@ -93,7 +93,6 @@ class _ParkCleaningGameScreenState extends State<ParkCleaningGameScreen>
   @override
   void initState() {
     super.initState();
-    _initializeGameAsync();
     
     _celebrationController = AnimationController(
       duration: const Duration(seconds: 2),
@@ -122,29 +121,18 @@ class _ParkCleaningGameScreenState extends State<ParkCleaningGameScreen>
     super.dispose();
   }
 
-  Future<void> _initializeGameAsync() async {
-    // Load saved level
-    currentLevel = await GameService.getCurrentLevel();
-    
-    // Load game start time if exists
-    _gameStartTime = await GameService.getGameStartTime();
-    
-    // If starting from level 1 and no game start time, record it
-    if (currentLevel == 1 && _gameStartTime == null) {
-      _gameStartTime = DateTime.now();
-      await GameService.saveGameStartTime(_gameStartTime!);
-    }
-    
-    setState(() {
-      _initializeGame();
-    });
-  }
+
 
   void _initializeGame() {
     // Get screen dimensions if available
     if (context.mounted) {
       _screenWidth = MediaQuery.of(context).size.width;
       _screenHeight = MediaQuery.of(context).size.height;
+    }
+    
+    // Record game start time for first level
+    if (currentLevel == 1) {
+      _gameStartTime = DateTime.now();
     }
     
     // Initialize recycling bins based on level - centered at bottom (relative positioning)
@@ -306,9 +294,6 @@ class _ParkCleaningGameScreenState extends State<ParkCleaningGameScreen>
   }
 
   Future<void> _resetGameAfterTimeUp() async {
-    await GameService.resetCurrentLevel();
-    await GameService.clearGameStartTime();
-    
     setState(() {
       currentLevel = 1;
       score = 0;
@@ -316,9 +301,6 @@ class _ParkCleaningGameScreenState extends State<ParkCleaningGameScreen>
       levelComplete = false;
       _gameStartTime = DateTime.now();
     });
-    
-    // Save new game start time
-    await GameService.saveGameStartTime(_gameStartTime!);
     
     setState(() {
       _initializeGame();
@@ -442,7 +424,7 @@ class _ParkCleaningGameScreenState extends State<ParkCleaningGameScreen>
         // Level complete, show next level option
         _showLevelCompleteDialog();
       } else {
-        // All levels complete - save high score
+        // All levels complete - save high score only when finishing all 5 levels
         await _saveHighScore();
         setState(() {
           gameComplete = true;
@@ -452,54 +434,38 @@ class _ParkCleaningGameScreenState extends State<ParkCleaningGameScreen>
     }
   }
 
-  void _nextLevel() async {
+  void _nextLevel() {
     setState(() {
       currentLevel++;
-    });
-    
-    // Save current level progress
-    await GameService.saveCurrentLevel(currentLevel);
-    
-    setState(() {
       _initializeGame();
     });
   }
 
-  void _resetGame() async {
+  void _resetGame() {
     setState(() {
       score = 0;
       currentLevel = 1;
       gameComplete = false;
       levelComplete = false;
-    });
-    
-    // Reset saved progress
-    await GameService.resetCurrentLevel();
-    await GameService.clearGameStartTime();
-    
-    // Start new game timer
-    _gameStartTime = DateTime.now();
-    await GameService.saveGameStartTime(_gameStartTime!);
-    
-    setState(() {
+      _gameStartTime = DateTime.now();
       _initializeGame();
     });
     _celebrationController.reset();
   }
 
   Future<void> _saveHighScore() async {
-    if (_gameStartTime != null) {
-      final completionTime = DateTime.now().difference(_gameStartTime!).inSeconds;
-      final gameScore = GameScore(
-        score: score,
-        completionTimeSeconds: completionTime,
-        completedAt: DateTime.now(),
-      );
-      
-      await GameService.saveHighScore(gameScore);
-      await GameService.clearGameStartTime();
-      await GameService.resetCurrentLevel();
-    }
+    // Calculate time from start to current level completion
+    final completionTime = _gameStartTime != null 
+        ? DateTime.now().difference(_gameStartTime!).inSeconds 
+        : 0;
+    
+    final gameScore = GameScore(
+      score: score,
+      completionTimeSeconds: completionTime,
+      completedAt: DateTime.now(),
+    );
+    
+    await GameService.saveParkGameHighScore(gameScore);
   }
 
   void _dismissCurrentSnackBar() {
@@ -509,6 +475,15 @@ class _ParkCleaningGameScreenState extends State<ParkCleaningGameScreen>
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    
+    // Initialize game on first build when screen dimensions are available
+    if (_screenWidth == 0 && _screenHeight == 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        setState(() {
+          _initializeGame();
+        });
+      });
+    }
 
     return Scaffold(
       body: Container(
@@ -1246,7 +1221,7 @@ class _ParkCleaningGameScreenState extends State<ParkCleaningGameScreen>
                     const SizedBox(height: 16),
                     // High Scores Section
                     FutureBuilder<List<GameScore>>(
-                      future: GameService.getHighScores(),
+                      future: GameService.getParkGameHighScores(),
                       builder: (context, snapshot) {
                         if (snapshot.hasData && snapshot.data!.isNotEmpty) {
                           final scores = snapshot.data!.take(5).toList();
