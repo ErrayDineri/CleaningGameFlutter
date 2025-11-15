@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
+import '../services/chat_api_service.dart';
 
 class Message {
   final String text;
   final bool isUser;
   final DateTime timestamp;
+  final bool isStreaming;
 
   Message({
     required this.text,
     required this.isUser,
     required this.timestamp,
+    this.isStreaming = false,
   });
 }
 
@@ -21,15 +24,38 @@ class ChatbotScreen extends StatefulWidget {
 
 class _ChatbotScreenState extends State<ChatbotScreen> {
   final TextEditingController _messageController = TextEditingController();
-  final List<Message> _messages = [
-    Message(
-      text: 'مرحباً! 👋 أنا مساعدك الذكي، كيف يمكنني مساعدتك اليوم؟',
-      isUser: false,
-      timestamp: DateTime.now(),
-    ),
-  ];
+  final List<Message> _messages = [];
   bool _isLoading = false;
   final ScrollController _scrollController = ScrollController();
+  String _streamingText = '';
+  
+  // System context for the chatbot
+  static const String systemContext = '''أنت مساعد ذكي ومفيد في تطبيق "لعبة التنظيف". 
+هدفك مساعدة المستخدمين في فهم اللعبة والإجابة على أسئلتهم.
+
+معلومات عن اللعبة:
+- لعبة "نظّف الحديقة": لعبة تعليمية لفرز القمامة حيث يجب وضع كل نوع في السلة المناسبة
+- أنواع القمامة: بلاستيك (أزرق)، ورق (أخضر)، معدن (رمادي)
+- 5 مستويات مع زيادة تدريجية في الصعوبة
+- 60 ثانية لكل مستوى
+- كل قطعة صحيحة = 10 نقاط
+- خطأ في الوضع = -5 ثواني من الوقت
+- يتم حفظ أفضل وقت لإنهاء جميع المستويات
+
+كن لطيفاً ومفيداً وأجب بالعربية.''';
+
+  @override
+  void initState() {
+    super.initState();
+    // Add welcome message
+    _messages.add(
+      Message(
+        text: 'مرحباً! 👋 أنا مساعدك الذكي في لعبة التنظيف، كيف يمكنني مساعدتك اليوم؟',
+        isUser: false,
+        timestamp: DateTime.now(),
+      ),
+    );
+  }
 
   @override
   void dispose() {
@@ -57,31 +83,114 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     _messageController.clear();
     _scrollToBottom();
 
-    // Simulate API call with loading state
-    _simulateChatbotResponse(userMessage);
+    // Call streaming API
+    _streamChatbotResponse(userMessage);
   }
 
-  void _simulateChatbotResponse(String userMessage) {
+  void _streamChatbotResponse(String userMessage) async {
     setState(() {
       _isLoading = true;
+      _streamingText = '';
     });
 
-    // TODO: Replace this with actual API call later
-    Future.delayed(const Duration(seconds: 1, milliseconds: 500), () {
+    // Add a placeholder message for streaming
+    final streamingMessageIndex = _messages.length;
+    _messages.add(
+      Message(
+        text: '',
+        isUser: false,
+        timestamp: DateTime.now(),
+        isStreaming: true,
+      ),
+    );
+
+    try {
+      // Build conversation history with context
+      final conversationHistory = <Map<String, String>>[
+        {'role': 'system', 'content': systemContext},
+        // Include last few messages for context (max 10)
+        ..._messages
+            .where((m) => !m.isStreaming)
+            .skip(_messages.length > 11 ? _messages.length - 11 : 0)
+            .map((m) => {
+                  'role': m.isUser ? 'user' : 'assistant',
+                  'content': m.text,
+                }),
+      ];
+
+      print('Sending request to API...');
+      print('Message count: ${conversationHistory.length}');
+
+      // Stream the response
+      var hasReceivedData = false;
+      await for (var chunk in ChatApiService.streamChat(
+        messages: conversationHistory,
+        config: {
+          'temperature': 0.7,
+          'max_tokens': 500,
+        },
+      )) {
+        hasReceivedData = true;
+        print('Received chunk: $chunk');
+        
+        if (mounted) {
+          setState(() {
+            _streamingText += chunk;
+            _messages[streamingMessageIndex] = Message(
+              text: _streamingText,
+              isUser: false,
+              timestamp: _messages[streamingMessageIndex].timestamp,
+              isStreaming: true,
+            );
+          });
+          _scrollToBottom();
+        }
+      }
+
+      print('Stream completed. Received data: $hasReceivedData');
+
+      // Mark streaming as complete
       if (mounted) {
         setState(() {
-          _messages.add(
-            Message(
-              text: 'شكراً على سؤالك! ✨ سيتم إضافة الرد من خلال API قريباً.',
+          // If no data was received, show error
+          if (!hasReceivedData || _streamingText.isEmpty) {
+            _messages[streamingMessageIndex] = Message(
+              text: 'لم يتم استلام رد من الخادم. تأكد من أن الخادم يعمل بشكل صحيح.',
               isUser: false,
-              timestamp: DateTime.now(),
-            ),
+              timestamp: _messages[streamingMessageIndex].timestamp,
+              isStreaming: false,
+            );
+          } else {
+            _messages[streamingMessageIndex] = Message(
+              text: _streamingText,
+              isUser: false,
+              timestamp: _messages[streamingMessageIndex].timestamp,
+              isStreaming: false,
+            );
+          }
+          _isLoading = false;
+          _streamingText = '';
+        });
+      }
+    } catch (e) {
+      print('Error in streaming: $e');
+      
+      // Handle error
+      if (mounted) {
+        setState(() {
+          _messages[streamingMessageIndex] = Message(
+            text: 'عذراً، حدث خطأ في الاتصال: ${e.toString()}\n\nتأكد من أن الخادم يعمل على: http://localhost:8000',
+            isUser: false,
+            timestamp: DateTime.now(),
+            isStreaming: false,
           );
           _isLoading = false;
+          _streamingText = '';
         });
-        _scrollToBottom();
       }
-    });
+    }
+
+    _scrollToBottom();
   }
 
   void _scrollToBottom() {
