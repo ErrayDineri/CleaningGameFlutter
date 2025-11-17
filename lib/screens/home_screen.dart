@@ -4,6 +4,7 @@ import 'park_cleaning_game_screen.dart';
 import 'water_game_screen.dart';
 import 'save_animals_game_screen.dart';
 import '../services/game_service.dart';
+import '../services/user_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -88,6 +89,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
+                    const SizedBox(height: 20),
+                    // User Profile Widget
+                    _buildUserProfile(),
                     const SizedBox(height: 20),
                     // Header with animation
                     AnimatedBuilder(
@@ -180,16 +184,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         _buildParkGameCard(context, delay: 0),
                         _buildWaterGameCard(context, delay: 100),
                         _buildAnimalsGameCard(context, delay: 200),
-                        _buildGameCard(
-                          context,
-                          title: 'اللعبة الرابعة',
-                          emoji: '🎪',
-                          gradient: [
-                            const Color(0xFF186A3B),
-                            const Color(0xFF0E6251),
-                          ],
-                          delay: 300,
-                        ),
                       ],
                     ),
                     const SizedBox(height: 40),
@@ -202,119 +196,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ),
       // Modern Chatbot Button
       floatingActionButton: _buildModernFAB(context),
-    );
-  }
-
-  Widget _buildGameCard(
-    BuildContext context, {
-    required String title,
-    required String emoji,
-    required List<Color> gradient,
-    required int delay,
-  }) {
-    return GestureDetector(
-      onTap: () {
-        // Navigate to specific games based on title
-        if (title == 'نظّف الحديقة') {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => const ParkCleaningGameScreen(),
-            ),
-          );
-        } else {
-          _showGameComingSoonDialog(context, title);
-        }
-      },
-      child: Card(
-        elevation: 12,
-        shadowColor: gradient[0].withOpacity(0.4),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: gradient,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: gradient[0].withOpacity(0.3),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: Stack(
-            children: [
-              // Background pattern
-              Positioned(
-                top: -20,
-                right: -20,
-                child: Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withOpacity(0.1),
-                  ),
-                ),
-              ),
-              // Content
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        emoji,
-                        style: const TextStyle(fontSize: 48),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        title,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.3,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.25),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Text(
-                          'اضغط للعب',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
@@ -1015,6 +896,152 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           fontSize: 14,
         ),
       ),
+    );
+  }
+
+  Widget _buildUserProfile() {
+    return FutureBuilder<Map<String, dynamic>>(
+      future: UserService.getUserProfile(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const SizedBox.shrink();
+        }
+
+        final profile = snapshot.data!;
+        final name = profile['name'] as String;
+        final level = profile['level'] as int;
+        final xp = profile['xp'] as int;
+        final xpNeeded = profile['xpNeeded'] as int;
+        final progress = profile['progress'] as double;
+
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color(0xFF27AE60),
+                Color(0xFF1E8449),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF27AE60).withOpacity(0.3),
+                blurRadius: 15,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              // Avatar
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white,
+                    width: 3,
+                  ),
+                ),
+                child: const Center(
+                  child: Text(
+                    '👶',
+                    style: TextStyle(fontSize: 32),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              // User info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.25),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text(
+                                '⭐',
+                                style: TextStyle(fontSize: 14),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'المستوى $level',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    // XP Progress bar
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '🎯 XP: $xp / $xpNeeded',
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: LinearProgressIndicator(
+                            value: progress.clamp(0.0, 1.0),
+                            minHeight: 8,
+                            backgroundColor: Colors.white.withOpacity(0.3),
+                            valueColor: const AlwaysStoppedAnimation<Color>(
+                              Colors.amber,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

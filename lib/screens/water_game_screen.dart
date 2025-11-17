@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import 'dart:async';
 import '../services/game_service.dart';
+import '../services/user_service.dart';
 
 enum WaterType {
   clean,
@@ -344,7 +345,101 @@ class _WaterGameScreenState extends State<WaterGameScreen>
     _showGameOverDialog();
   }
 
+  void _showLevelUpDialog(int xpEarned) async {
+    final profile = await UserService.getUserProfile();
+    final newLevel = profile['level'] as int;
+    
+    if (!mounted) return;
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Column(
+          children: [
+            Text('⭐', style: TextStyle(fontSize: 60)),
+            SizedBox(height: 8),
+            Text(
+              'تهانينا!',
+              style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'لقد ارتقيت إلى مستوى أعلى!',
+              style: TextStyle(fontSize: 18),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF3498DB).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Column(
+                children: [
+                  Text(
+                    'المستوى $newLevel',
+                    style: const TextStyle(
+                      fontSize: 36,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF3498DB),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '+$xpEarned XP',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          Center(
+            child: ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF3498DB),
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text(
+                'رائع!',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showGameOverDialog() {
+    // Award XP based on score: 1 XP per 10 points
+    final xpEarned = (score / 10).floor();
+    UserService.addXp(xpEarned).then((leveledUp) {
+      if (leveledUp && mounted) {
+        Future.delayed(const Duration(seconds: 1), () {
+          if (mounted) {
+            _showLevelUpDialog(xpEarned);
+          }
+        });
+      }
+    });
+    
     showDialog(
       context: context,
       barrierDismissible: false,
