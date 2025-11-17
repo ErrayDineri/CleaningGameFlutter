@@ -33,6 +33,7 @@ class GameService {
   // Separate storage keys for each game
   static const String _parkGameHighScoresKey = 'park_cleaning_high_scores';
   static const String _waterGameHighScoresKey = 'water_game_high_scores';
+  static const String _animalsGameHighScoresKey = 'animals_game_high_scores';
 
   // Save high score for Park Cleaning Game
   static Future<void> saveParkGameHighScore(GameScore score) async {
@@ -42,6 +43,11 @@ class GameService {
   // Save high score for Water Game
   static Future<void> saveWaterGameHighScore(GameScore score) async {
     await _saveHighScore(score, _waterGameHighScoresKey);
+  }
+
+  // Save high score for Animals Game
+  static Future<void> saveAnimalsGameHighScore(GameScore score) async {
+    await _saveHighScore(score, _animalsGameHighScoresKey);
   }
 
   // Internal method to save high score
@@ -87,6 +93,11 @@ class GameService {
     return _getHighScores(_waterGameHighScoresKey);
   }
 
+  // Get high scores for Animals Game
+  static Future<List<GameScore>> getAnimalsGameHighScores() async {
+    return _getHighScores(_animalsGameHighScoresKey);
+  }
+
   // Internal method to get high scores
   static Future<List<GameScore>> _getHighScores(String storageKey) async {
     final prefs = await SharedPreferences.getInstance();
@@ -122,6 +133,26 @@ class GameService {
     final scores = await getWaterGameHighScores();
     if (scores.isNotEmpty) {
       return scores.first.score; // Already sorted by score descending
+    }
+    return null;
+  }
+
+  // Get highest score for Animals Game
+  static Future<int?> getAnimalsGameHighestScore() async {
+    final scores = await getAnimalsGameHighScores();
+    if (scores.isNotEmpty) {
+      return scores.first.score; // Already sorted by score descending
+    }
+    return null;
+  }
+
+  // Get best completion time for Animals Game (fastest time among high scores)
+  static Future<int?> getAnimalsGameBestCompletionTime() async {
+    final scores = await getAnimalsGameHighScores();
+    if (scores.isNotEmpty) {
+      return scores
+          .map((score) => score.completionTimeSeconds)
+          .reduce((a, b) => a < b ? a : b);
     }
     return null;
   }

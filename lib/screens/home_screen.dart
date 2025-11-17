@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'chatbot_screen.dart';
 import 'park_cleaning_game_screen.dart';
 import 'water_game_screen.dart';
+import 'save_animals_game_screen.dart';
 import '../services/game_service.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -178,16 +179,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       children: [
                         _buildParkGameCard(context, delay: 0),
                         _buildWaterGameCard(context, delay: 100),
-                        _buildGameCard(
-                          context,
-                          title: 'اللعبة الثالثة',
-                          emoji: '🌟',
-                          gradient: [
-                            const Color(0xFF1E8449),
-                            const Color(0xFF145A32),
-                          ],
-                          delay: 200,
-                        ),
+                        _buildAnimalsGameCard(context, delay: 200),
                         _buildGameCard(
                           context,
                           title: 'اللعبة الرابعة',
@@ -382,6 +374,28 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       ),
                     ),
                   ),
+                  // Info button
+                  Positioned(
+                    top: 8,
+                    left: 8,
+                    child: IconButton(
+                      icon: const Icon(
+                        Icons.info_outline,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                      onPressed: () => _showGameDescription(
+                        context,
+                        'نظّف الحديقة 🧹',
+                        'تعلم كيفية فرز النفايات بشكل صحيح!\n\n'
+                        '🎯 الهدف: رمي القمامة في السلة المناسبة\n'
+                        '♻️ تعلم الفرز إلى: بلاستيك، ورق، زجاج، ومعادن\n'
+                        '⏱️ 5 مستويات - أكمل كل المستويات بأسرع وقت\n'
+                        '🌍 الفائدة البيئية: فرز النفايات يساعد في إعادة التدوير ويقلل التلوث',
+                        const Color(0xFF27AE60),
+                      ),
+                    ),
+                  ),
                   // Content
                   Center(
                     child: Padding(
@@ -405,6 +419,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               fontSize: 15,
                               fontWeight: FontWeight.bold,
                               letterSpacing: 0.3,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'تعلم فرز النفايات للحفاظ على البيئة',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                              height: 1.3,
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -553,6 +578,28 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     ),
                   ),
                 ),
+                // Info button
+                Positioned(
+                  top: 8,
+                  left: 8,
+                  child: IconButton(
+                    icon: const Icon(
+                      Icons.info_outline,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                    onPressed: () => _showGameDescription(
+                      context,
+                      'المياه النقية 💧',
+                      'احمِ مصادر المياه من التلوث!\n\n'
+                      '🎯 الهدف: اجمع قطرات الماء النظيف فقط\n'
+                      '⚠️ تجنب قطرات الماء الملوثة\n'
+                      '💪 3 أرواح - لا تخسرهم جميعاً\n'
+                      '🌊 الفائدة البيئية: المياه النظيفة ضرورية للحياة، يجب حمايتها من التلوث الصناعي والكيميائي',
+                      const Color(0xFF3498DB),
+                    ),
+                  ),
+                ),
                 // Content
                 Center(
                   child: Padding(
@@ -580,15 +627,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         ),
                         const SizedBox(height: 4),
                         const Text(
-                          'اجمع الماء النظيف فقط',
+                          'حافظ على نظافة المياه وتجنب التلوث',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: Colors.white70,
-                            fontSize: 11,
+                            fontSize: 10,
                             fontWeight: FontWeight.w500,
+                            height: 1.3,
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 4),
                         // Highest score display or "لم تلعب بعد"
                         if (highestScore == null)
                           Container(
@@ -654,6 +702,76 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+  void _showGameDescription(BuildContext context, String title, String description, Color color) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                Icons.eco,
+                color: color,
+                size: 28,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                  color: color,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Text(
+            description,
+            style: const TextStyle(
+              fontSize: 15,
+              height: 1.6,
+              color: Colors.black87,
+            ),
+            textAlign: TextAlign.right,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            style: TextButton.styleFrom(
+              backgroundColor: color.withOpacity(0.1),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: Text(
+              'حسناً',
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ),
+        ],
+        actionsAlignment: MainAxisAlignment.center,
+      ),
+    );
+  }
+
   Future<Map<String, dynamic>> _getParkGameStats() async {
     final highestScore = await GameService.getParkGameHighestScore();
     final bestTime = await GameService.getParkGameBestCompletionTime();
@@ -670,6 +788,206 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return {
       'highestScore': highestScore,
     };
+  }
+
+  Future<Map<String, dynamic>> _getAnimalsGameStats() async {
+    final bestTime = await GameService.getAnimalsGameBestCompletionTime();
+    
+    return {
+      'bestTime': bestTime,
+    };
+  }
+
+  Widget _buildAnimalsGameCard(BuildContext context, {required int delay}) {
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _getAnimalsGameStats(),
+      builder: (context, snapshot) {
+        final bestTime = snapshot.data?['bestTime'];
+        
+        return TweenAnimationBuilder(
+          tween: Tween<double>(begin: 0, end: 1),
+          duration: Duration(milliseconds: 600 + delay),
+          curve: Curves.easeOutCubic,
+          builder: (context, double value, child) {
+            return Transform.translate(
+              offset: Offset(0, 50 * (1 - value)),
+              child: Opacity(
+                opacity: value,
+                child: child,
+              ),
+            );
+          },
+          child: GestureDetector(
+            onTap: () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const SaveAnimalsGameScreen(),
+                ),
+              );
+              setState(() {});
+            },
+            child: Card(
+              elevation: 12,
+              shadowColor: const Color(0xFFE67E22).withOpacity(0.4),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFFE67E22),
+                      Color(0xFFD35400),
+                    ],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFE67E22).withOpacity(0.3),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Stack(
+                  children: [
+                    // Background pattern
+                    Positioned(
+                      top: -20,
+                      right: -20,
+                      child: Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withOpacity(0.1),
+                        ),
+                      ),
+                    ),
+                    // Info button
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: IconButton(
+                        icon: const Icon(
+                          Icons.info_outline,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                        onPressed: () => _showGameDescription(
+                          context,
+                          'أنقذ الحيوانات 🐢',
+                          'أنقذ الحيوانات البحرية من خطر النفايات!\n\n'
+                          '🎯 الهدف: حرر الحيوانات العالقة في القمامة\n'
+                          '🐢 اضغط على الحيوان لإنقاذه\n'
+                          '⏱️ 5 مستويات - 15 ثانية لكل مستوى\n'
+                          '🌊 الفائدة البيئية: النفايات البلاستيكية تقتل آلاف الحيوانات البحرية سنوياً، يجب التخلص منها بشكل صحيح',
+                          const Color(0xFFE67E22),
+                        ),
+                      ),
+                    ),
+                    // Content
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(12.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text(
+                              '🐢',
+                              style: TextStyle(fontSize: 48),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'أنقذ الحيوانات',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'احمِ الحياة البحرية من أخطار النفايات',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                                height: 1.3,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            // Best time display or "لم تلعب بعد"
+                            if (bestTime == null)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Text(
+                                  'لم تلعب بعد',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              )
+                            else
+                              Text(
+                                'أفضل وقت: ${GameService.formatTime(bestTime)}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Text(
+                                'اضغط للعب',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Widget _buildModernFAB(BuildContext context) {

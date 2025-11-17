@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'dart:convert';
 import '../services/chat_api_service.dart';
 
@@ -46,19 +47,25 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   String _streamingText = '';
   
   // System context for the chatbot
-  static const String systemContext = '''أنت مساعد ذكي ومفيد في تطبيق "لعبة التنظيف". 
-هدفك مساعدة المستخدمين في فهم اللعبة والإجابة على أسئلتهم.
+  static const String systemContext = '''أنت صديق ومساعد ذكي للأطفال، تهتم بالبيئة وتعليم العادات الصحية. 
+أنت لطيف، مشجع، ومتحمس لمساعدة الأطفال على فهم أهمية الحفاظ على كوكبنا.
 
-معلومات عن اللعبة:
-- لعبة "نظّف الحديقة": لعبة تعليمية لفرز القمامة حيث يجب وضع كل نوع في السلة المناسبة
-- أنواع القمامة: بلاستيك (أزرق)، ورق (أخضر)، معدن (رمادي)
-- 5 مستويات مع زيادة تدريجية في الصعوبة
-- 60 ثانية لكل مستوى
-- كل قطعة صحيحة = 10 نقاط
-- خطأ في الوضع = -5 ثواني من الوقت
-- يتم حفظ أفضل وقت لإنهاء جميع المستويات
+دورك:
+- تعليم الأطفال عن البيئة، إعادة التدوير، والحفاظ على النظافة
+- الإجابة على أسئلتهم عن الطبيعة، الحيوانات، والنباتات
+- مساعدتهم في فهم الألعاب التعليمية في التطبيق
+- تشجيعهم على العادات الصحية والإيجابية
+- استخدام أمثلة بسيطة وممتعة مناسبة لأعمارهم
 
-كن لطيفاً ومفيداً وأجب بالعربية.''';
+قواعد مهمة:
+- استخدم لغة بسيطة وواضحة مناسبة للأطفال (6-12 سنة)
+- كن إيجابياً ومشجعاً دائماً
+- لا تشارك أي محتوى غير آمن أو غير مناسب للأطفال
+- تجنب المواضيع السياسية، العنيفة، أو المخيفة
+- شجع السلوكيات الإيجابية والصديقة للبيئة
+- استخدم الرموز التعبيرية والأمثلة الممتعة
+
+أجب دائماً بالعربية الفصحى البسيطة.''';
 
   @override
   void initState() {
@@ -175,7 +182,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     setState(() {
       _messages.add(
         Message(
-          text: 'مرحباً! 👋\n\nأنا هنا لمساعدتك في تعلم كيفية الحفاظ على البيئة وإعادة التدوير بشكل صحيح.\n\nكيف يمكنني مساعدتك اليوم؟',
+          text: 'مرحباً صديقي! 👋🌍\n\nأنا هنا لأساعدك في التعرف على البيئة وكيفية الحفاظ على كوكبنا الجميل! 🌱\n\nيمكنك أن تسألني عن:\n• الطبيعة والحيوانات 🦁🌳\n• إعادة التدوير والنظافة ♻️\n• كيفية حماية البيئة 🌊\n• أي شيء آخر تريد معرفته! 🤗\n\nما الذي تود أن نتحدث عنه اليوم؟',
           isUser: false,
           timestamp: DateTime.now(),
         ),
@@ -741,20 +748,68 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                     ? CrossAxisAlignment.end
                     : CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    message.text,
-                    textDirection: TextDirection.rtl,
-                    textAlign: TextAlign.right,
-                    style: TextStyle(
-                      color: message.isUser
-                          ? Colors.white
-                          : Colors.black,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      height: 1.5,
-                      letterSpacing: 0.3,
-                    ),
-                  ),
+                  message.isUser
+                      ? Text(
+                          message.text,
+                          textDirection: TextDirection.rtl,
+                          textAlign: TextAlign.right,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            height: 1.5,
+                            letterSpacing: 0.3,
+                          ),
+                        )
+                      : MarkdownBody(
+                          data: message.text,
+                          styleSheet: MarkdownStyleSheet(
+                            p: TextStyle(
+                              color: Colors.black,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              height: 1.5,
+                              letterSpacing: 0.3,
+                            ),
+                            strong: TextStyle(
+                              color: Colors.black,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            em: TextStyle(
+                              color: Colors.black87,
+                              fontSize: 14,
+                              fontStyle: FontStyle.italic,
+                            ),
+                            listBullet: TextStyle(
+                              color: colorScheme.primary,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            code: TextStyle(
+                              backgroundColor: Colors.grey[200],
+                              color: Colors.black87,
+                              fontSize: 13,
+                              fontFamily: 'monospace',
+                            ),
+                            h1: TextStyle(
+                              color: colorScheme.primary,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            h2: TextStyle(
+                              color: colorScheme.primary,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            h3: TextStyle(
+                              color: Colors.black,
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          selectable: true,
+                        ),
                   const SizedBox(height: 4),
                   Text(
                     _formatTime(message.timestamp),
